@@ -4,60 +4,88 @@
 #include <ctype.h>
 #include <assert.h>
 
-char line[255]= {0};
+char buf[255]= {0};
+int bufn= 0;
 
-char *skipspc(char *s) {
-  while(s && *s && isspace(*s)) s++;
-  return s;
+FILE *f= NULL;
+int c= 0, lineno= 0;
+
+void skipspc();
+
+int is(const char *i);
+
+int ensure() {
+  if (bufn>0) return 1;
+
+  char *ln= fgets(buf, sizeof(buf), f);
+  if (!ln) return 0;
+  lineno++;
+  if (ln[strlen(ln)-1]=='\n')
+    ln[strlen(ln)-1]= 0;
+  printf("%d: %s\n", lineno, buf);
+
+  skipspc();
+  if (!*buf || is("//") || is("#include")) {
+    // force another call
+    bufn= 0;
+  }
+
+  return ensure();
 }
 
-int is(char *s, const char *i) {
-  return strncmp(s, i, strlen(i))==0;
+int peek() {
+  return ensure()? buf[0]: 0;
 }
 
-char *skip(char *s, const char *i) {
-  s= skipspc(s);
-  if (is(s, i)) s+= strlen(i);
-  s= skipspc(s);
-  return s;
+int step() {
+  int c= peek();
+  memcpy(buf, buf+1, sizeof(buf)-1);
+  if (--bufn<0) bufn= 0;
+  return c;
 }
 
-int got(char **p, const char *i) {
-  *p= skipspc(*p);
-  char *s= skip(*p, i);
-  int r= s!=*p;
-  *p= skipspc(s);
-  return r;
+void skipspc() {
+  while(peek() && isspace(peek()))
+    step();
 }
 
-char *next(char *s) {
-  s= skipspc(s);
-  while(*s && !isspace(*s)) s++;
-  s= skipspc(s);
-  return s;
+int is(const char *i) {
+  return ensure() && strncmp(buf, i, strlen(i))==0;
 }
 
-int istype(char *s) {
-  return is(s, "int") || is(s, "void");
+int got(const char *i) {
+  skipspc();
+  if (is(i)) {
+    int n= strlen(i);
+    while(n--) step();
+    skipspc();
+    return 1;
+  }
+  return 0;
 }
 
-char *getname(char *s) {
-  s= skipspc(s);
-  char *start= s;
+void expect(const char *e) {
+  if (!got(e)) {
+    printf("ERROR AT '%s'\n", buf);
+    printf("Expected '%s'\n", e);
+    assert(!"unexpected char");
+  }
+}
+
+char *getname() {
+  skipspc();
+  // TODO: may not always work? (nl/comement?)
+  char *s= buf;
   while (*s && isalnum(*s)) s++;
-  return strndup(start, s-start);
-}
-
-char *takename(char **p) {
-  char *r= getname(*p);
-  *p+= strlen(r);
+  char *r = strndup(buf, s-buf);
+  int n= strlen(r);
+  while(n--) step();
   return r;
 }
 
-int skippedtype(char **p) {
-  if (istype(*p)) {
-    *p= next(*p);
-    if (is(*p, "*")) *p= skipspc(*p+1);
+int gottype() {
+  if (got("int") || got("char")) {
+    got("*"); // optional
     return 1;
   }
   return 0;
@@ -66,151 +94,134 @@ int skippedtype(char **p) {
 const char *ops[]= {
   "++", "+", "--", "-", "*", "/", "%", "&&", "&", "||", "|", "^", "<<", "<", ">>", ">", "==", "="};
 
-const char *getop(char **p) {
+const char *getop() {
   for(int i=0; i<sizeof(ops)/sizeof(*ops); i++) {
-    if (got(p, ops[i])) return ops[i];
+    if (got(ops[i])) return ops[i];
   }
   return NULL;
 }
 
-void takeblock(char **p);
+void takeblock();
 
-void expect(char **p, const char *e) {
-  if (!got(p, e)) {
-    printf("ERROR AT '%s'\n", *p);
-    printf("Expected '%s'\n", e);
-    assert(!"unexpected char");
-  }
-}
+void takeexpression() {
+  int paren= got("(");
 
-void takeexpression(char **p) {
-  int paren= got(p, "(");
+  const char *prefixop= getop();
 
-  const char *prefixop= getop(p);
-
-  if (isalpha(**p)) {
-    char *name= takename(p);
+  if (isalpha(peek())) {
+    char *name= getname();
   
     // function call? ( , )
-    if (is(*p, "(")) {
+    if (is("(")) {
       do {
-        *p= skip(*p, ",");
-        takeexpression(p);
-      } while (is(*p, ","));
+        takeexpression();
+      } while (got(","));
       printf("\t%s\n", name);
 
     } else {
       // variable
       printf("\t%s\n", name);
     }
-    free(name);
+    if (name) free(name);
 
-  } else if (isdigit(**p)) {
-    // number
+  } else if (isdigit(peek())) {
+    char *s= getname();
     int d= 0, r, n= 0;
-    if (1== (r= sscanf(*p, "%d %n", &d, &n))) {
+    if (1== (r= sscanf(s, "%d %n", &d, &n))) {
       printf("\t%d\n", d);
-      *p+= n;
     } else {
       printf("scanf=>r=%d\n", r);
-      printf("ERROR AT '%s'\n", *p);
+      printf("ERROR AT '%s'\n", buf);
       assert(!"bad char in number");
     }
-  } else if (got(p, "\"")) {
+    if (s) free(s);
+  } else if (got("\"")) {
     // string
     printf("\t\"");
-    while(**p && **p!='"') {
-      putchar(**p);
-      (*p)++;
-    }
+    while(peek() && peek()!='"')
+      putchar(step());
     printf("\"\n");
-  } else if (got(p, "\'")) {
-    printf("\t%d\n", **p);
-    assert(got(p, "\'"));
+  } else if (got("\'")) {
+    printf("\t%d\n", step());
+    expect("\'");
   } else {
-    printf("ERROR AT '%s'\n", *p);
+    printf("ERROR AT '%s'\n", buf);
     assert(!"unexpected char");
   }
 
-  const char *op= getop(p);
+  const char *op= getop();
   if (op) {
-    takeexpression(p);
+    takeexpression();
     printf("\t%s\n", op);
   }
 
   if (prefixop)
     printf("\tPREFIX_%s\n", prefixop);
 
-  if (paren) expect(p, ")");
+  if (paren) expect(")");
 }
 
-int takestatement(char **p) {
-  if (is(*p, "{")) {
-    takeblock(p);
-  } else if (got(p, "return")) {
-    takeexpression(p);
-  } else if (got(p, "if")) {
-    takeexpression(p);
-    takestatement(p);
-    if (got(p, "else"))
-      takestatement(p);
-  } else if (got(p, "while")) {
-    takeexpression(p);
+int takestatement() {
+  if (is("{")) {
+    takeblock();
+  } else if (got("return")) {
+    takeexpression();
+  } else if (got("if")) {
+    takeexpression();
+    takestatement();
+    if (got("else"))
+      takestatement();
+  } else if (got("while")) {
+    takeexpression();
     // TODO:
-  } else if (got(p, "do")) {
-    takeexpression(p);
+  } else if (got("do")) {
+    takeexpression();
     // TODO:
-  } else if (got(p, ";")) {
+  } else if (got(";")) {
     ; // haha!
-  } else {
+  } else if (isalnum(peek())) {
     // "proc" call (no care value)
-    takeexpression(p);
+    takeexpression();
     printf("\tdrop\n");
+  } else {
+    return 0;
   }
+  return 1;
 }
 
-void takeblock(char **p) {
-  expect(p, "{");
-  while(takestatement(p));
-  expect(p, "}");
+void takeblock() {
+  expect("{");
+  while(takestatement());
+  expect("}");
+}
+
+void takeprogram() {
+  // function definition
+  if (gottype()) {
+    char *name= getname();
+    printf("\t: %s \n", name);
+    
+    expect("(");
+    while(gottype()) {
+      char *param= getname();
+      printf("\t-- param: %s\n", param);
+      free(param);
+      got(",");
+    }
+    expect(")");
+
+    takeblock();
+      
+    printf("\t;\n");
+    if (name) free(name);
+  }
+
+  // over-simplified
+  takestatement();
 }
 
 int main(void) {
-  char *ln;
-  int n=0;
-  while((ln= fgets(line, sizeof(line), stdin)) && *ln) {
-    n++;
-    if (ln[strlen(ln)-1]=='\n')
-      ln[strlen(ln)-1]= 0;
-    printf("%d: %s\n", n, line);
+  f= stdin;
 
-    ln= skipspc(ln);
-    if (!*ln) continue;
-    if (is(ln, "//")) continue;
-    if (is(ln, "#include")) continue;
-
-    // function definition
-    if (skippedtype(&ln)) {
-      char *name= takename(&ln);
-      printf("\t: %s \n", name);
-
-      expect(&ln, "(");
-      while(skippedtype(&ln)) {
-        char *param= takename(&ln);
-        printf("\t-- param: %s\n", param);
-        free(param);
-        (void)got(&ln, ",");
-      }
-      expect(&ln, ")");
-
-      takeblock(&ln);
-
-      printf("\t;\n");
-      free(name);
-      continue;
-    }
-
-    // over-simplified
-    takestatement(&ln);
-  }
+  takeprogram();
 }

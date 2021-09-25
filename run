@@ -1,1 +1,5 @@
-clang c2f.c && ./a.out < fib.c
+#clang -g c2f.c && gdb ./a.out
+
+clang -g c2f.c && ./a.out < fib.c
+
+
