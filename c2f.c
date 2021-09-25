@@ -73,6 +73,16 @@ const char *getop(char **p) {
   return NULL;
 }
 
+void takeblock(char **p);
+
+void expect(char **p, const char *e) {
+  if (!got(p, e)) {
+    printf("ERROR AT '%s'\n", *p);
+    printf("Expected '%s'\n", e);
+    assert(!"unexpected char");
+  }
+}
+
 void takeexpression(char **p) {
   int paren= got(p, "(");
 
@@ -131,10 +141,38 @@ void takeexpression(char **p) {
   if (prefixop)
     printf("\tPREFIX_%s\n", prefixop);
 
-  if (paren && !got(p, ")")) {
-    printf("ERROR AT '%s'\n", *p);
-    assert(!"no end paren");
+  if (paren) expect(p, ")");
+}
+
+int takestatement(char **p) {
+  if (is(*p, "{")) {
+    takeblock(p);
+  } else if (got(p, "return")) {
+    takeexpression(p);
+  } else if (got(p, "if")) {
+    takeexpression(p);
+    takestatement(p);
+    if (got(p, "else"))
+      takestatement(p);
+  } else if (got(p, "while")) {
+    takeexpression(p);
+    // TODO:
+  } else if (got(p, "do")) {
+    takeexpression(p);
+    // TODO:
+  } else if (got(p, ";")) {
+    ; // haha!
+  } else {
+    // "proc" call (no care value)
+    takeexpression(p);
+    printf("\tdrop\n");
   }
+}
+
+void takeblock(char **p) {
+  expect(p, "{");
+  while(takestatement(p));
+  expect(p, "}");
 }
 
 int main(void) {
@@ -156,35 +194,23 @@ int main(void) {
       char *name= takename(&ln);
       printf("\t: %s \n", name);
 
+      expect(&ln, "(");
       while(skippedtype(&ln)) {
+        char *param= takename(&ln);
+        printf("\t-- param: %s\n", param);
+        free(param);
         (void)got(&ln, ",");
       }
+      expect(&ln, ")");
 
-      // TODO: parse block - recurse!
-      continue;
+      takeblock(&ln);
 
       printf("\t;\n");
       free(name);
       continue;
     }
 
-    if (got(&ln, "return")) {
-      takeexpression(&ln);
-    } else if (got(&ln, "if")) {
-      takeexpression(&ln);
-      // takestatement(&ln);
-      // if (got(&ln, "else")) takestatement(&ln);
-      // TODO:
-    } else if (got(&ln, "while")) {
-      takeexpression(&ln);
-      // TODO:
-    } else if (got(&ln, "do")) {
-      takeexpression(&ln);
-      // TODO:
-    } else {
-      // "proc" call (no care value)
-      takeexpression(&ln);
-      printf("\tdrop\n");
-    }
+    // over-simplified
+    takestatement(&ln);
   }
 }
