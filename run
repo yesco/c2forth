@@ -1,0 +1,1 @@
+clang c2f.c && ./a.out < fib.c
