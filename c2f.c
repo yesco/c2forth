@@ -17,11 +17,16 @@ int is(const char *i);
 int ensure() {
   if (bufn>0) return 1;
 
+  bufn= 0;
   char *ln= fgets(buf, sizeof(buf), f);
   if (!ln) return 0;
+
+  bufn= strlen(ln);
   lineno++;
-  if (ln[strlen(ln)-1]=='\n')
+  if (ln[strlen(ln)-1]=='\n') {
     ln[strlen(ln)-1]= 0;
+    bufn--;
+  }
   printf("%d: %s\n", lineno, buf);
 
   skipspc();
@@ -45,7 +50,7 @@ int step() {
 }
 
 void skipspc() {
-  while(peek() && isspace(peek()))
+  while(ensure() && isspace(peek()))
     step();
 }
 
@@ -59,6 +64,7 @@ int got(const char *i) {
     int n= strlen(i);
     while(n--) step();
     skipspc();
+    ensure();
     return 1;
   }
   return 0;
@@ -66,7 +72,7 @@ int got(const char *i) {
 
 void expect(const char *e) {
   if (!got(e)) {
-    printf("ERROR AT '%s'\n", buf);
+    printf("ERROR AT %d '%s'\n", bufn, buf);
     printf("Expected '%s'\n", e);
     assert(!"unexpected char");
   }
@@ -84,7 +90,7 @@ char *getname() {
 }
 
 int gottype() {
-  if (got("int") || got("char")) {
+  if (got("void") || got("int") || got("char")) {
     got("*"); // optional
     return 1;
   }
@@ -112,15 +118,19 @@ void takeexpression() {
     char *name= getname();
   
     // function call? ( , )
-    if (is("(")) {
+    if (got("(")) {
+      // TODO: this is PASCAL calling style
+      // C-calling style would be reversed!
+      // (for argv/printf it's needed!)
       do {
         takeexpression();
       } while (got(","));
+      expect(")");
       printf("\t%s\n", name);
-
+      
     } else {
       // variable
-      printf("\t%s\n", name);
+      printf("\t%s", name);
     }
     if (name) free(name);
 
@@ -128,10 +138,10 @@ void takeexpression() {
     char *s= getname();
     int d= 0, r, n= 0;
     if (1== (r= sscanf(s, "%d %n", &d, &n))) {
-      printf("\t%d\n", d);
+      printf("\t%d", d);
     } else {
       printf("scanf=>r=%d\n", r);
-      printf("ERROR AT '%s'\n", buf);
+      printf("ERROR AT %d '%s'\n", bufn, buf);
       assert(!"bad char in number");
     }
     if (s) free(s);
@@ -140,19 +150,20 @@ void takeexpression() {
     printf("\t\"");
     while(peek() && peek()!='"')
       putchar(step());
+    step();
     printf("\"\n");
   } else if (got("\'")) {
     printf("\t%d\n", step());
     expect("\'");
   } else {
-    printf("ERROR AT '%s'\n", buf);
+    printf("ERROR AT %d '%s'\n", bufn, buf);
     assert(!"unexpected char");
   }
 
   const char *op= getop();
   if (op) {
     takeexpression();
-    printf("\t%s\n", op);
+    printf("\t%s", op);
   }
 
   if (prefixop)
@@ -166,11 +177,16 @@ int takestatement() {
     takeblock();
   } else if (got("return")) {
     takeexpression();
+    printf("\texit\n");
   } else if (got("if")) {
     takeexpression();
+    printf("\tif\n");
     takestatement();
-    if (got("else"))
+    if (got("else")) {
+      printf("\telse");
       takestatement();
+    }
+    printf("\tendif\n");
   } else if (got("while")) {
     takeexpression();
     // TODO:
@@ -196,28 +212,33 @@ void takeblock() {
 }
 
 void takeprogram() {
-  // function definition
-  if (gottype()) {
-    char *name= getname();
-    printf("\t: %s \n", name);
+  while(peek()) {
+
+    // function definition
+    if (gottype()) {
+      char *name= getname();
+      printf("\t: %s \n", name);
     
-    expect("(");
-    while(gottype()) {
-      char *param= getname();
-      printf("\t-- param: %s\n", param);
-      free(param);
-      got(",");
-    }
-    expect(")");
+      expect("(");
+      while(gottype()) {
+        char *param= getname();
+        if (!param) break;
+        printf("\t-- param: %s\n", param);
+        free(param);
+        got(",");
+      }
+      expect(")");
 
-    takeblock();
+      takeblock();
+
+      printf("\t;\n");
+      if (name) free(name);
+    } else {
       
-    printf("\t;\n");
-    if (name) free(name);
+      // over-simplified
+      takestatement();
+    }
   }
-
-  // over-simplified
-  takestatement();
 }
 
 int main(void) {

@@ -8,4 +8,5 @@ int fib(int n) {
 
 int main(void) {
   printf("Fib(7)=%d\n", fib(7));
+  printf("%d %d% %d %d\n", 1,2,3,4);
 }
