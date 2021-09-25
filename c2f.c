@@ -63,8 +63,6 @@ int got(const char *i) {
   if (is(i)) {
     int n= strlen(i);
     while(n--) step();
-    skipspc();
-    ensure();
     return 1;
   }
   return 0;
@@ -217,16 +215,18 @@ void takeprogram() {
     // function definition
     if (gottype()) {
       char *name= getname();
-      printf("\t: %s \n", name);
+      printf("\t: %s ", name);
     
       expect("(");
+      printf(" {");
       while(gottype()) {
         char *param= getname();
         if (!param) break;
-        printf("\t-- param: %s\n", param);
+        printf("  %s", param);
         free(param);
         got(",");
       }
+      printf(" }\n");
       expect(")");
 
       takeblock();
