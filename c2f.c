@@ -27,7 +27,9 @@ int ensure() {
     ln[strlen(ln)-1]= 0;
     bufn--;
   }
+  printf("\e[32m");
   printf("%d: %s\n", lineno, buf);
+  printf("\e[37m");
 
   skipspc();
   if (!*buf || is("//") || is("#include")) {
@@ -124,11 +126,11 @@ void takeexpression() {
         takeexpression();
       } while (got(","));
       expect(")");
-      printf("\t%s\n", name);
+      printf("    %s\n", name);
       
     } else {
       // variable
-      printf("\t%s", name);
+      printf("    %s", name);
     }
     if (name) free(name);
 
@@ -136,7 +138,7 @@ void takeexpression() {
     char *s= getname();
     int d= 0, r, n= 0;
     if (1== (r= sscanf(s, "%d %n", &d, &n))) {
-      printf("\t%d", d);
+      printf("    %d", d);
     } else {
       printf("scanf=>r=%d\n", r);
       printf("ERROR AT %d '%s'\n", bufn, buf);
@@ -145,13 +147,13 @@ void takeexpression() {
     if (s) free(s);
   } else if (got("\"")) {
     // string
-    printf("\t\"");
+    printf("    \"");
     while(peek() && peek()!='"')
       putchar(step());
     step();
     printf("\"\n");
   } else if (got("\'")) {
-    printf("\t%d\n", step());
+    printf("    %d\n", step());
     expect("\'");
   } else {
     printf("ERROR AT %d '%s'\n", bufn, buf);
@@ -161,11 +163,11 @@ void takeexpression() {
   const char *op= getop();
   if (op) {
     takeexpression();
-    printf("\t%s", op);
+    printf("    %s", op);
   }
 
   if (prefixop)
-    printf("\tPREFIX_%s\n", prefixop);
+    printf("    PREFIX_%s\n", prefixop);
 
   if (paren) expect(")");
 }
@@ -175,16 +177,16 @@ int takestatement() {
     takeblock();
   } else if (got("return")) {
     takeexpression();
-    printf("\texit\n");
+    printf("    exit\n");
   } else if (got("if")) {
     takeexpression();
-    printf("\tif\n");
+    printf("    if\n");
     takestatement();
     if (got("else")) {
-      printf("\telse");
+      printf("    else");
       takestatement();
     }
-    printf("\tendif\n");
+    printf("    endif\n");
   } else if (got("while")) {
     takeexpression();
     // TODO:
@@ -196,7 +198,7 @@ int takestatement() {
   } else if (isalnum(peek())) {
     // "proc" call (no care value)
     takeexpression();
-    printf("\tdrop\n");
+    printf("    drop\n");
   } else {
     return 0;
   }
@@ -215,7 +217,7 @@ void takeprogram() {
     // function definition
     if (gottype()) {
       char *name= getname();
-      printf("\t: %s ", name);
+      printf("    : %s ", name);
     
       expect("(");
       printf(" {");
@@ -231,7 +233,7 @@ void takeprogram() {
 
       takeblock();
 
-      printf("\t;\n");
+      printf("    ;\n");
       if (name) free(name);
     } else {
       
