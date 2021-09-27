@@ -1,10 +1,21 @@
+//  ALF (ALphabetical Forth)
+// 
+//  (>) 2021 Jonas SKarlsson
+//
+// The Conceptual ALfabetical Forth:
+// - https://github.com/yesco/ALForth/blob/main/alf-bytecode.txt
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
 
+
+const int trace= 0;
+
+
 typedef unsigned char byte;
-typedef unsigned int word;
+typedef int word;
 typedef word cell;
 
 #define WZ (sizeof(word))
@@ -36,6 +47,8 @@ void init(int size) {
   quit();
   here= pc;
   sp= &memw[SP_INIT/WZ];
+  // put a 0 on stack => quit!
+  *sp++= 0;
 }
 
 void abort_(char *s) {
@@ -62,8 +75,6 @@ void strcomma(char *s) {
   if (t>=0) strcpy((char*)&mem[t], s);
 }
 
-const trace= 1;
-
 void print_op(word addr, byte op) {
   printf("@%4x = '%c' (%02x)\n", addr, (op>31 && op<127)?op:'?', op);
 }
@@ -81,7 +92,10 @@ void literal(byte op) {
   pc--;
 }
 
-#define emit putchar
+void emit(int c) {
+  putchar(c);
+  fflush(stdout);
+}
 
 int type(byte *s) {
   byte *start= s;
@@ -93,16 +107,40 @@ int type(byte *s) {
 }
 
 void NIY(char *name) {
-  printf("%% %name not implemented yet!\n", name);
+  printf("%% %s not implemented yet!\n", name);
   exit(1);
 }
 
+void seek(byte end) {
+  int n= 0;
+  while(pc && pc<MEM) {
+    byte c= mem[pc++];
+    switch(c) {
+    case '(': case '[': case '{':
+      n++; break;
+    case ')': case ']': case '}':
+      if (!n--) return; else break;
+    case '"':
+      while(pc && pc<MEM) {
+        c= mem[pc++];
+        if (!c || c=='"') return;
+        if (c=='\\') pc++;
+      }
+    default: break;
+    }
+  }
+  // error
+  abort_("Unmatched char in seek");
+}
+
 void hash() {
+  cell a;
+
   byte op= mem[pc++];
   if (trace) print_op(pc-1, op);
   switch(op) {
 
-  case '#': *++sp= sp-&memw[RP_INIT/WZ]; break;
+  case '#': a= sp-&memw[RP_INIT/WZ]; *++sp=a; break;
   case '-': literal(op); *sp= -*sp; break;
 
   case 'w': // within
@@ -222,22 +260,102 @@ A   ax   assoc execute
     ap   pad
 */
 
+int sum= 0;
 void run(int steps) {
   cell a;
 
-  while(steps-- && pc) {
-    byte op= mem[pc++];
-    if (trace) print_op(pc-1, op);
+// this is pretty optimal now
+//#define SUPERSPEED
+#ifdef SUPERSPEED
+//  while(steps-- && pc) {
+//  while(pc) { // save 15 % !
 
+//  while(steps--) { // test is faster than no tes!?
+
+// using this reduces cost 5%
+  cell *rp1= rp-1; 
+
+  while(pc) { // test is faster than no tes!?
+//  while(1) { // really slow? WTF?
+
+    byte op= mem[pc++];
     // user ops
-    if (op & 0x80) {
-      
-      continue;
-    }
 
     // basic ops
     switch(op) {
-    case 0: pc= *sp--; break; // rts
+
+    case ')': {
+      sum++; // cost 2/50
+      if ((*rp)-- > 0) {
+// really super costly!!!!
+        pc= *(rp-1);
+//pc= *rp1; // 4 % faster
+      } else {
+        rp-= 2;
+//rp1=rp-1;
+      }
+      break;
+    }
+
+    case '(':
+      a= *sp--;
+      if (a-->0) {
+        *++rp= pc;
+        *++rp= a;
+//rp1=rp-1;
+      } else {
+        seek(')');
+      }
+      break;
+
+    case '0'...'9': literal(op); break; 
+
+      // slightly faster than test before!
+    case (128)...(255):
+      continue;
+
+    // actually 15% faster here!
+    case 0: pc= *rp--;
+      if (!pc) return; else break;
+      
+    default: break;
+    }
+
+  }
+  return;
+#endif
+
+//  while(steps-- && pc) { // slowest 5.37s
+//  while(1) {  // slower!!!??? // 5.31s
+  while(pc) { // 50% faster! 2.22s  !!!
+    byte op= mem[pc++];
+
+    if (trace) print_op(pc-1, op);
+
+    // basic ops
+    switch(op) {
+
+    case ')':
+// TODO: just for testing
+      sum++; // 15% overhead for empty loop
+      if ((*rp)-- > 0) {
+        pc= *(rp-1);
+      } else {
+        rp-= 2;
+      }
+      break;
+    case '(':
+      a= *sp--;
+      if (a-->0) {
+        *++rp= pc;
+        *++rp= a;
+      } else {
+        seek(')');
+      }
+      break;
+    case 'i': *++sp= *rp; break;
+    case 'j': *++sp= *(rp-2); break;
+
       // HMMM, control codes?
     case (1)...(9): pc+= op; break; // rel
     case (14)...(31): pc+= op-32; break; // -rel
@@ -248,8 +366,6 @@ void run(int steps) {
     case 's': a= *(sp-1); *(sp-1)= *sp; *sp= a; break;
     case 'p': NIY("pick"); break;
     case 'r': rrr(); break;
-    case 'i': *++sp= *rp; break;
-    case 'j': *++sp= *(rp-1); break;
 
     case '@': *sp= memw[*sp]; break;
     case '!': a= *sp--; memw[a]= *sp--; break;
@@ -278,7 +394,7 @@ void run(int steps) {
     case '$': dollar(); break;
 
     case 'e': emit(*sp--); break;
-    case '.': printf("%d ", *sp--); break;
+    case '.': printf("%d ", *sp--); fflush(stdout); break;
     case 't': type(&mem[*sp--]); break;
 
     case 'q': quit(); break;
@@ -290,6 +406,17 @@ void run(int steps) {
       // correct? (if at 1-3?)
     case ',': memw[here+=WZ]= *sp--; break;
 
+    case '?': // if
+    case ']': // unloop/exit/leave
+    case '[': // again? continue/next
+
+      // 2% faster here than at top
+    case 0: pc= *rp--; // rts
+      if (pc) continue; else return;
+
+      // user ops (2% faster below 0!)
+    case (128)...(255):
+      continue;
 
       // TODO:
 
@@ -310,21 +437,15 @@ void run(int steps) {
 //    case 'w': www(); break;
 //    case 'y': yyy(); break;
 
-    case '\'': // char
-    case '"': // string
-    case ':': // define
-    case ';': // end
+//    case '\'': // char
+//    case '"': // string
+//    case ':': // define
+//    case ';': // end
 
-    case '(': // for
-    case ')': // loop
-    case '?': // if
-    case ']': // unloop/exit/leave
-    case '[': // again? continue/next
-
-    case 'x': // eval/execute
-    case 'k': // key()
+//    case 'x': // eval/execute
+//    case 'k': // key()
     default:
-      printf("%%Illegal op "); print_op(mem-1, op);
+      printf("%%Illegal op "); print_op(pc-1, op);
       pc= 0;
       return;
     }
@@ -334,10 +455,31 @@ void run(int steps) {
 int main(void) {
   init(MEM);
 
-  *sp++= 0;
-  strcomma("33 44 + .");
+  const int bench= 0;
+  if (bench) {
+    // reference
+    if(1) {
+      int sum= 0;
+      // 1.53s
+      for(int i=500000000; i; i--) {
+        sum++;
+        // % 1000 is 1.35 s and faster???
+        //if (i%1000==0) fprintf(stdout, ".");
+        if (i%100000000==0) sum++;
+      }
+      printf("%d\n", sum);
+      exit(1);
+    } else {
+      // 2.24s - 46% overhead (ok...)
+      strcomma("500000000()"); 
+    }
+  } else {
+    strcomma("33 44 + .  3(i.)   0(i.) 1(i.)     33 . 500000000() 99 .");
+  }
+  
+  while(pc) run(1024);
+  printf("SUM=%d\n", sum);
 
-  while(pc) run(1000);
 
   free(mem);
 }
