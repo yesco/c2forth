@@ -7,8 +7,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+
 #include <ctype.h>
 #include <assert.h>
+
+
+// TODO:
+// - extract symbols from libraries?
+// nm -gD /data/data/com.termux/files/usr/lib/* | grep "T strdup
 
 
 const int trace= 0;
@@ -260,6 +267,27 @@ A   ax   assoc execute
     ap   pad
 */
 
+void *funs[]={
+  exit, malloc, free, realloc,
+  fopen, fclose, open, close, lseek, fseek, read, write,
+  getc, fgetc, putchar, fputc, printf, sprintf, fprintf, sscanf, fscanf, fgets, fputs,
+};
+
+#define LEN(arr) (sizeof(arr)/sizeof(*arr))
+
+void execute() {
+  int fn= *sp--;
+  assert(fn>0 && fn<LEN(funs));
+  cell (*f)(cell, ...) = funs[fn];
+  int n= *sp--;
+  assert(n>=0 && n<=10); // TODO: ?
+  sp-= n; // point to first
+  // TODO: siwtch of exact
+  cell r= f(sp[0], sp[1], sp[2], sp[3], sp[4], sp[5], sp[6], sp[7], sp[8], sp[9]);
+  if (n) sp--;
+  *++sp= r;
+}
+
 int sum= 0;
 void run(int steps) {
   cell a;
@@ -406,13 +434,15 @@ void run(int steps) {
       // correct? (if at 1-3?)
     case ',': memw[here+=WZ]= *sp--; break;
 
-    case '?': // if
+    case '?': *sp= !!*sp; break; // if
     case ']': // unloop/exit/leave
     case '[': // again? continue/next
 
       // 2% faster here than at top
     case 0: pc= *rp--; // rts
       if (pc) continue; else return;
+
+    case 'x': execute(); break;
 
       // user ops (2% faster below 0!)
     case (128)...(255):
@@ -442,7 +472,6 @@ void run(int steps) {
 //    case ':': // define
 //    case ';': // end
 
-//    case 'x': // eval/execute
 //    case 'k': // key()
     default:
       printf("%%Illegal op "); print_op(pc-1, op);
