@@ -182,7 +182,8 @@ void ccc() {
 
   case 'r': emit('\r'); break;
 
-  case 'b': a= *sp--; *sp++= ' '; *sp= a; // fallthrough
+  case 'b': a= *sp--; *sp++= ' '; *sp= a;
+    // fallthrough // cb char-blanks...
   case '#':
     for(int n=*sp--; n>0; n--)
       emit(*sp);
@@ -190,6 +191,9 @@ void ccc() {
     break;
 
   case '"': // counted string?
+    // TODO: Not clear how to point and interact with like puts and printf??? maybe need 8 byte proxy pointers?
+    // maybe let cell default to pointer size?
+    break;
   case 'o': // count (string?)
   case '\'':  // c' or '
   case 'c':  // create
@@ -279,13 +283,12 @@ void execute() {
   int fn= *sp--;
   assert(fn>0 && fn<LEN(funs));
   cell (*f)(cell, ...) = funs[fn];
-  int n= *sp--;
+  int n= *sp;
   assert(n>=0 && n<=10); // TODO: ?
   sp-= n; // point to first
   // TODO: siwtch of exact
-  cell r= f(sp[0], sp[1], sp[2], sp[3], sp[4], sp[5], sp[6], sp[7], sp[8], sp[9]);
-  if (n) sp--;
-  *++sp= r;
+  if (!n) sp++;
+  sp[0] = f(sp[0], sp[1], sp[2], sp[3], sp[4], sp[5], sp[6], sp[7], sp[8], sp[9]);
 }
 
 int sum= 0;
@@ -503,7 +506,8 @@ int main(void) {
       strcomma("500000000()"); 
     }
   } else {
-    strcomma("33 44 + .  3(i.)   0(i.) 1(i.)     33 . 500000000() 99 .");
+    // 65 1 14 x == putchar('A')
+    strcomma("33 44 + .  3(i.)   0(i.) 1(i.)     33 . 77 65 1 14 x . .");
   }
   
   while(pc) run(1024);
