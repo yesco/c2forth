@@ -271,6 +271,8 @@ A   ax   assoc execute
     ap   pad
 */
 
+// https://sourceware.org/newlib/libm.html
+// 
 void *funs[]={
   exit, malloc, free, realloc,
   fopen, fclose, open, close, lseek, fseek, read, write,
