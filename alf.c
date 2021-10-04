@@ -22,7 +22,9 @@ const int trace= 0;
 
 
 typedef unsigned char byte;
-typedef int word;
+//typedef int word;
+//typedef word cell;
+typedef long word;
 typedef word cell;
 
 #define WZ (sizeof(word))
@@ -48,7 +50,8 @@ void quit() {
 }
 
 void init(int size) {
-  assert(sizeof(cell)==4);
+  //assert(sizeof(cell)==4);
+  assert(sizeof(cell)==sizeof(cell*));
   memw= (void*)(mem= calloc(MEM, 1));
   
   quit();
@@ -218,6 +221,48 @@ void dollar() {
     printf("%% illegal extened op '$%c'\n", op);
     exit(1);
   }
+}
+
+// FramePointer: if "parameters" activated
+// TODO: it's actually not a normal FramePointer
+//     as normally fp+o == parameter
+//                 fp-o == local
+
+// : foo 3 l# lc lb la ;
+
+// 11 22 33 44 foo 
+// => 11 44 33 22
+cell *fp= NULL;
+
+void lll() {
+  cell *a;
+  byte op= mem[pc++];
+  if (trace) print_op(pc-1, op);
+  switch(op) {
+
+    // test: clang alf.c -o alf && (echo "11 22 33 44 2 l# la . lb . la lb + lx . . . " | ./alf) 
+  case '#': a= fp; fp= sp-*sp; *++sp= (cell)a; *++sp= (cell)fp; break;
+  case 'x': if (fp) {
+    a= sp;
+    while(*sp--!=(cell)fp);
+    int n= a-sp-1;
+    // replace args with return vals
+    memmove(fp, a, n*sizeof(cell));
+    a= fp;
+    fp= (cell*)*sp--; // restore prev
+    sp= a+n-1;
+    printf(" {%d} ", n);
+    break; }
+  case 'a'...'j': *++sp= *(fp+(op-'a')); break;
+
+  default:
+    printf("%% illegal extened op 'l%c'\n", op);
+    exit(1);
+  }
+}
+
+void user(byte op) {
+  NIY("user()");
 }
 
 void rrr() {
@@ -399,6 +444,7 @@ void run(int steps) {
     case 's': a= *(sp-1); *(sp-1)= *sp; *sp= a; break;
     case 'p': NIY("pick"); break;
     case 'r': rrr(); break;
+    case 'l': lll(); break;
 
     case '@': *sp= memw[*sp]; break;
     case '!': a= *sp--; memw[a]= *sp--; break;
@@ -449,9 +495,25 @@ void run(int steps) {
 
     case 'x': execute(); break;
 
+      // TODO: optimize for space&speed
+      // 0-9 x
+    // case (128+'0')...(128+'9'):
+
+      // unicode 10xx xxxx (64 cont)
+      //   case (0x80)...(0xbf):
+      // unicode 110x xxxx (32 2b)
+      // unicode 1110 xxxx (16 3b)
+      // unicode 1111 0xxx (8 4b)
+
+      // unicode 1111 10xx (4 -)  ?
+      // unicode 1111 110x (2 -)  ?
+      // unicode 1111 1110 (1) (debug)
+      // unicode 1111 1111 (1) (return)
+
       // user ops (2% faster below 0!)
-    case (128)...(255):
-      continue;
+    case 'A'...'Z': // temp usage
+    case (128)...(255): // user dispatch
+      user(op); break;
 
     case '"': // string
       *++sp= MEM+pc; // add of string
@@ -469,12 +531,10 @@ void run(int steps) {
 //    case '{': break;
 //    case '}': break;
 
-//    case 'l': lll(); break;
 //    case 'b': bbb(); break;
 //    case 'c': ccc(); break;
 //    case 'f': fff(); break;
 //    case 'g': ggg(); break;
-//    case 'l': lll(); break;
 //    case 'm': mmm(); break;
 //    case 'u': uuu(); break;
 //    case 'v': vvv(); break;
