@@ -1,0 +1,19 @@
+# Emit LLVM IR (instead of host machine code)
+# -S \ # Emit human-readable assembly rather than binary
+clang \
+  --target=wasm32 \
+  -emit-llvm \
+  -c \
+  -S \
+  add.c
+
+# And as a result we get add.ll containing the LLVM IR. I’m only showing this here for completeness sake. When working with WebAssembly, or even with clang when developing C, you never get into contact with LLVM IR.
+
+# LLVM IR is full of additional meta data and annotations, allowing the back-end compiler to make more informed decisions when generating machine code.
+# Turning LLVM IR into object files
+# The next step is invoking LLVMs backend compiler llc to turn the LLVM IR into an object file:
+
+llc \
+  -march=wasm32 \
+  -filetype=obj \
+  add.ll
