@@ -1,5 +1,12 @@
-#clang -g c2f.c && gdb ./a.out
-
-clang -g c2f.c && ./a.out < fib.c
+clang c2f.c -o c2f || exit
+./c2f <fib.c | grep -ivP '\d:' > fib.f
+clang alf.c -o alf || exit
+echo "---"
+perl bytecode.pl < fib.f | tee fib.alf
+echo "---"
+echo
+wc fib.c fib.f fib.alf
+echo
+./alf <fib.alf
 
 

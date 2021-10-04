@@ -79,7 +79,7 @@ word allot(word size) {
 void strcomma(char *s) {
   word l= here + strlen(s)+1;
   word t= allot(l);
-  if (t>=0) strcpy((char*)&mem[t], s);
+  if (t>=0) strcat((char*)&mem[t], s);
 }
 
 void print_op(word addr, byte op) {
@@ -453,7 +453,16 @@ void run(int steps) {
     case (128)...(255):
       continue;
 
-      // TODO:
+    case '"': // string
+      *++sp= MEM+pc; // add of string
+      while(pc && pc<MEM) {
+        byte c= mem[pc++];
+        if (!c || c=='"') break;
+        if (c=='\\') pc++;
+      }
+      break;
+
+      // --- TODO:
 
 //    case '_': break;
 //    case '`': break;
@@ -473,7 +482,6 @@ void run(int steps) {
 //    case 'y': yyy(); break;
 
 //    case '\'': // char
-//    case '"': // string
 //    case ':': // define
 //    case ';': // end
 
@@ -486,9 +494,7 @@ void run(int steps) {
   }
 }
 
-int main(void) {
-  init(MEM);
-
+void test() {
   const int bench= 0;
   if (bench) {
     // reference
@@ -511,10 +517,32 @@ int main(void) {
     // 65 1 14 x == putchar('A')
     strcomma("33 44 + .  3(i.)   0(i.) 1(i.)     33 . 77 65 1 14 x . .");
   }
-  
   while(pc) run(1024);
   printf("SUM=%d\n", sum);
+}
 
+int main(void) {
+  init(MEM);
+  //test();
+
+  FILE* f= stdin;
+
+  char buf[255]= {0};
+  int lineno= 0;
+
+  char *ln;
+  while((ln= fgets(buf, sizeof(buf), f))) {
+    lineno++;
+    if (ln[strlen(ln)-1]=='\n') {
+      ln[strlen(ln)-1]= 0;
+    }
+    if (!*ln) continue;
+    
+    strcomma(ln);
+  }
+  // fclose(f);
+
+  while(pc) run(1024);
 
   free(mem);
 }

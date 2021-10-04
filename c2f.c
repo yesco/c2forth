@@ -27,9 +27,7 @@ int ensure() {
     ln[strlen(ln)-1]= 0;
     bufn--;
   }
-  printf("\e[32m");
-  printf("%d: %s\n", lineno, buf);
-  printf("\e[37m");
+  printf("\e[32m%d: %s\e[37m\n", lineno, buf);
 
   skipspc();
   if (!*buf || is("//") || is("#include")) {
