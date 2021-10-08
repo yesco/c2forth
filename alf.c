@@ -478,7 +478,7 @@ void run(int steps) {
 
     case 'q': quit(); break;
 
-    case '\n': case '\r': case ' ': break;
+    case '\n': case '\r': case ' ': case '\t': break;
 
     case 'a': allot(*sp--); break;
     case 'h': *++sp= here; break;
@@ -486,8 +486,8 @@ void run(int steps) {
     case ',': memw[here+=WZ]= *sp--; break;
 
     case '?': *sp= !!*sp; break; // if
-    case ']': // unloop/exit/leave
-    case '[': // again? continue/next
+    case ']': NIY("exit"); // unloop/exit/leave
+    case '[': NIY("next"); // again? continue/next
 
       // 2% faster here than at top
     case 0: pc= *rp--; // rts
@@ -510,6 +510,11 @@ void run(int steps) {
       // unicode 1111 1110 (1) (debug)
       // unicode 1111 1111 (1) (return)
 
+    case '`': // "sos!" (c a= b= v)
+      **(sp-1)= *sp;
+      sp--;
+      break;
+
       // user ops (2% faster below 0!)
     case 'A'...'Z': // temp usage
     case (128)...(255): // user dispatch
@@ -526,26 +531,26 @@ void run(int steps) {
 
       // --- TODO:
 
-//    case '_': break;
-//    case '`': break;
-//    case '{': break;
-//    case '}': break;
-
-//    case 'b': bbb(); break;
-//    case 'c': ccc(); break;
-//    case 'f': fff(); break;
-//    case 'g': ggg(); break;
-//    case 'm': mmm(); break;
-//    case 'u': uuu(); break;
-//    case 'v': vvv(); break;
-//    case 'w': www(); break;
-//    case 'y': yyy(); break;
-
 //    case '\'': // char
 //    case ':': // define
 //    case ';': // end
 
 //    case 'k': // key()
+
+//    case '_': break; // ???
+//    case '{': break; // local scope?
+//    case '}': break;
+
+//    case 'b': bbb(); break; // buffer
+//    case 'c': ccc(); break; // char
+//    case 'f': fff(); break; // float
+//    case 'g': ggg(); break; // geap
+//    case 'm': mmm(); break; // memory
+//    case 'u': uuu(); break; // unsigned
+//    case 'v': vvv(); break; // variable?
+//    case 'w': www(); break; // 2...
+//    case 'y': yyy(); break; // ???
+
     default:
       printf("%%Illegal op "); print_op(pc-1, op);
       pc= 0;

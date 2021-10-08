@@ -112,6 +112,8 @@ void takeexpression() {
 
   const char *prefixop= getop();
 
+  int isvar= 0;
+
   if (isalpha(peek())) {
     char *name= getname();
   
@@ -124,11 +126,12 @@ void takeexpression() {
         takeexpression();
       } while (got(","));
       expect(")");
-      printf("    %s\n", name);
+      printf("    _%s\n", name);
       
     } else {
-      // variable
-      printf("    %s", name);
+      // variable (value)
+      printf("    _%s", name);
+      isvar= 1;
     }
     if (name) free(name);
 
@@ -160,8 +163,18 @@ void takeexpression() {
 
   const char *op= getop();
   if (op) {
+    // LOL, because of hashstrings...
+    assert("="=="=");
+    if (op=="=") { // EQ, lol
+      // "lvalue"
+      op= ":=";
+    } else if (isvar) {
+      printf(" @ ");
+    }
     takeexpression();
     printf("    %s", op);
+  } else if (isvar) {
+    printf(" @ ");
   }
 
   if (prefixop)
@@ -212,26 +225,38 @@ void takeblock() {
 void takeprogram() {
   while(peek()) {
 
-    // function definition
+    // definition func/var
     if (gottype()) {
       char *name= getname();
-      printf("    : %s ", name);
+      if (got("(")) { // function
+        printf("    : _%s ", name);
     
-      expect("(");
-      printf(" {");
-      while(gottype()) {
-        char *param= getname();
-        if (!param) break;
-        printf("  %s", param);
-        free(param);
-        got(",");
+        // params
+        printf(" {");
+        while(gottype()) {
+          char *param= getname();
+          if (!param || !*param) break;
+          printf("  _%s", param);
+          free(param);
+          got(",");
+        }
+        printf(" }\n");
+        expect(")");
+
+        // body
+        takeblock();
+        printf("    ;\n");
+
+      } else { // variable
+        // TODO: store type... (maybe no need for int and char* lol?)
+        // TODO: this is fine for globals, but scopped, local vars in functions?
+        printf("    variable %s\n", name);
+        if (got("=")) {
+          takeexpression();
+          printf("    _%s !\n", name);
+        }
       }
-      printf(" }\n");
-      expect(")");
 
-      takeblock();
-
-      printf("    ;\n");
       if (name) free(name);
     } else {
       
