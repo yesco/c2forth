@@ -87,12 +87,42 @@ char *getname() {
   return r;
 }
 
-int gottype() {
-  if (got("void") || got("int") || got("char")) {
-    got("*"); // optional
-    return 1;
+const char *types[]= {
+  "_DYMMUTYPE", "void", "char", "int", "long", "float", "double", "struct"};
+
+// returns type index, -index if pointer
+// (However: "char *a, b" - b is char!)
+int gettype() {
+  int _signed= got("signed");
+  int _unsigned= got("unsigned");
+  // long long? long double/float?
+
+  for(int i=0; i<sizeof(types)/sizeof(*types); i++) {
+    if (got(types[i])) {
+      // TODO: structs/union
+      assert(types[i]!="struct");
+      int pointer= got("*");
+      return pointer?-i:i;
+    }
   }
+  // no type recognized
+  // TODO: typedefs?
+  if (_signed || _unsigned)
+    assert(!"unexpected signed/unsigned");
   return 0;
+}
+
+void takeexpression();
+
+void takevardef(int type, char *name, const char *scope) {
+  int array= got("[");
+  // TODO: handle array decl/assign
+  assert(!array);
+  printf("    %s _%s\n", scope, name);
+  if (got("=")) {
+    takeexpression();
+    printf("    _%s !\n", name);
+  }
 }
 
 const char *ops[]= {
@@ -206,12 +236,29 @@ int takestatement() {
     // TODO:
   } else if (got(";")) {
     ; // haha!
-  } else if (isalnum(peek())) {
-    // "proc" call (no care value)
-    takeexpression();
-    printf("    drop\n");
   } else {
-    return 0;
+    int type= gettype();
+    if (type) {
+      // local var?
+      char *name= getname();
+      assert(name);
+      takevardef(type, name, "local");
+      if (name) free(name);
+      return 1;
+    }
+
+    // proc/func call/assignment
+    if (isalnum(peek())) {
+      takeexpression();
+      // assume all fun/assign return value
+      printf("    drop\n");
+      // TODO: don't drop if first parameter is same value/var! (do at byte coder?)
+      return 1;
+
+    } else {
+      // not recognized
+      return 0;
+    }
   }
   return 1;
 }
@@ -226,17 +273,20 @@ void takeprogram() {
   while(peek()) {
 
     // definition func/var
-    if (gottype()) {
+    int type= gettype();
+    if (type) {
       char *name= getname();
       if (got("(")) { // function
         printf("    : _%s ", name);
     
         // params
         printf(" {");
-        while(gottype()) {
+        int type;
+        while((type= gettype())) {
           char *param= getname();
           if (!param || !*param) break;
           printf("  _%s", param);
+          // TODO: capture name assign local id
           free(param);
           got(",");
         }
@@ -250,11 +300,7 @@ void takeprogram() {
       } else { // variable
         // TODO: store type... (maybe no need for int and char* lol?)
         // TODO: this is fine for globals, but scopped, local vars in functions?
-        printf("    variable %s\n", name);
-        if (got("=")) {
-          takeexpression();
-          printf("    _%s !\n", name);
-        }
+        takevardef(type, name, "variable");
       }
 
       if (name) free(name);

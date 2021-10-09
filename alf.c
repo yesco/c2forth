@@ -516,7 +516,12 @@ void run(int steps) {
       break;
 
       // user ops (2% faster below 0!)
-    case 'A'...'Z': // temp usage
+    case 'A'...'Z': // temp proc name
+      // TODO: make A..Z be params+locals!
+      // at end def:
+      //
+      //     ; 3 4 parlocs
+
     case (128)...(255): // user dispatch
       user(op); break;
 
