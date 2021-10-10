@@ -156,9 +156,21 @@ void addLocal(int type, char *name) {
   nvar++;
 }
 
+void dumpVars() {
+  // dump variables
+  for(int i=0; i<nvar; i++) {
+    struct variable *v= &variables[i];
+    printf("VAR %s : %s %s %d\n", v->name,
+           !v->type? "SCOPE" : types[v->type<0?-v->type:v->type],
+           v->type<0? "*": " ",
+           v->rel);
+  }
+}
+
 // TODO: this doesn NOT handle nested functions, not needed for standard C
 void beginScope() {
   addGlobal(0, NULL);
+dumpVars();
 }
 
 void endScope() {
@@ -167,12 +179,14 @@ void endScope() {
   while(i-->0) {
     struct variable *v= &variables[i];
     if (!v->type) { // is beginscope
-      nvar= i? i-1: 0; // hmm
+      nvar= i;
+dumpVars();
       return;
     }
   }
   // reach top scope, reset relative
   lrel= 0;
+dumpVars();
 }
 
 struct variable *findVar(char* name) {
@@ -185,6 +199,9 @@ struct variable *findVar(char* name) {
   }
   return NULL;
 }
+
+
+
 
 void takeexpression();
 
@@ -424,12 +441,5 @@ int main(void) {
 
   takeprogram();
 
-  // dump variables
-  for(int i=0; i<nvar; i++) {
-    struct variable *v= &variables[i];
-    printf("VAR %s : %s %s %d\n", v->name,
-           !v->type? "SCOPE" : types[v->type<0?-v->type:v->type],
-           v->type<0? "*": " ",
-           v->rel);
-  }
+  dumpVars();
 }
