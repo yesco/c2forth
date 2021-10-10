@@ -19,6 +19,8 @@ int main(void) {
     printf("  a11,b22=%d,%d\n", a, b);
     a= b*3;
     printf("  a66,b22=%d,%d\n", a, b);
+    int del=666;
+    printf("  del666=%d\n", del);
   }
   printf("a8,b22=%d,%d\n", a, b);
   printf("sfoo=%s\n", s);

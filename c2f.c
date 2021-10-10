@@ -161,7 +161,7 @@ void endScope() {
   while(i-->0) {
     struct variable *v= &variables[i];
     if (!v->type) { // is beginscope
-      nvar= i-1;
+      nvar= i? i-1: 0; // hmm
       return;
     }
   }
@@ -299,6 +299,7 @@ int takestatement() {
       // local var?
       char *name= getname();
       assert(name);
+      addLocal(type, name);
       takevardef(type, name, "local");
       if (name) free(name);
       return 1;
@@ -322,7 +323,9 @@ int takestatement() {
 
 void takeblock() {
   expect("{");
+  beginScope();
   while(takestatement());
+  endScope();
   expect("}");
 }
 
@@ -357,6 +360,7 @@ void takeprogram() {
       } else { // variable
         // TODO: store type... (maybe no need for int and char* lol?)
         // TODO: this is fine for globals, but scopped, local vars in functions?
+        addGlobal(type, name);
         takevardef(type, name, "variable");
       }
 
@@ -373,4 +377,13 @@ int main(void) {
   f= stdin;
 
   takeprogram();
+
+  // dump globals
+  for(int i=0; i<nvar; i++) {
+    struct variable *v= &variables[i];
+    printf("VAR %s : %s %s %d\n", v->name,
+           !v->type? "SCOPE" : types[v->type<0?-v->type:v->type],
+           v->type<0? "*": " ",
+           v->rel);
+  }
 }
