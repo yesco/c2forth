@@ -76,6 +76,11 @@ void expect(const char *e) {
   }
 }
 
+void NIY(char *s) {
+  printf("%s\n", s);
+  assert(!"error");
+}
+
 char *getname() {
   skipspc();
   // TODO: may not always work? (nl/comement?)
@@ -118,6 +123,7 @@ int gettype() {
 
 
 #define MAXVAR 1024
+#define GLOBAL -1
 
 struct variable {
   int type; // 0==new scope
@@ -134,7 +140,7 @@ void addGlobal(int type, char *name) {
   struct variable *v= &variables[nvar];
   v->type= type;
   v->name= name?strdup(name):NULL;
-  v->rel= -1;
+  v->rel= GLOBAL;
 
   nvar++;
 }
@@ -169,6 +175,17 @@ void endScope() {
   lrel= 0;
 }
 
+struct variable *findVar(char* name) {
+  for(int i=nvar-1; i>=0; i--) {
+    struct variable *v= &variables[i];
+    if (v->name && 0==strcmp(v->name, name)) {
+      // found
+      return v;
+    }
+  }
+  return NULL;
+}
+
 void takeexpression();
 
 void takevardef(int type, char *name, const char *scope) {
@@ -192,6 +209,16 @@ const char *getop() {
   return NULL;
 }
 
+void deref(struct variable *v) {
+  if (!v) return;
+
+  if (v->rel==GLOBAL) {
+    printf(" @ ");
+  } else {
+    printf(" @frame ");
+  }
+}
+
 void takeblock();
 
 void takeexpression() {
@@ -199,7 +226,7 @@ void takeexpression() {
 
   const char *prefixop= getop();
 
-  int isvar= 0;
+  struct variable *var= NULL;
 
   if (isalpha(peek())) {
     char *name= getname();
@@ -217,8 +244,16 @@ void takeexpression() {
       
     } else {
       // variable (value)
-      printf("    _%s", name);
-      isvar= 1;
+      var= findVar(name);
+      if (!var) {
+        printf("%% variable '%s' not found\n", name);
+        exit(1);
+      }
+      if (var->rel==GLOBAL) {
+        printf("    _%s", name);
+      } else {
+        printf("    %d ", var->rel, name);
+      }
     }
     if (name) free(name);
 
@@ -248,20 +283,28 @@ void takeexpression() {
     assert(!"unexpected char");
   }
 
+  // handle assignment/reference
   const char *op= getop();
   if (op) {
-    // LOL, because of hashstrings...
+    // assignment
     assert("="=="=");
     if (op=="=") { // EQ, lol
       // "lvalue"
-      op= ":=";
-    } else if (isvar) {
-      printf(" @ ");
+      if (!var) NIY("Can't handle nonvar assignements yet");
+      if (var->rel==GLOBAL) {
+        op= ":=";
+      } else {
+        op= ":frame=";
+      }
+    } else {
+      deref(var);
     }
     takeexpression();
     printf("    %s", op);
-  } else if (isvar) {
-    printf(" @ ");
+
+  } else {
+    // just reference
+    deref(var);
   }
 
   if (prefixop)
@@ -338,7 +381,8 @@ void takeprogram() {
       char *name= getname();
       if (got("(")) { // function
         printf("    : _%s ", name);
-    
+        beginScope();
+
         // params
         printf(" {");
         int type;
@@ -346,7 +390,7 @@ void takeprogram() {
           char *param= getname();
           if (!param || !*param) break;
           printf("  _%s", param);
-          // TODO: capture name assign local id
+          addLocal(type, param);
           free(param);
           got(",");
         }
@@ -355,6 +399,8 @@ void takeprogram() {
 
         // body
         takeblock();
+
+        endScope();
         printf("    ;\n");
 
       } else { // variable
@@ -378,7 +424,7 @@ int main(void) {
 
   takeprogram();
 
-  // dump globals
+  // dump variables
   for(int i=0; i<nvar; i++) {
     struct variable *v= &variables[i];
     printf("VAR %s : %s %s %d\n", v->name,
