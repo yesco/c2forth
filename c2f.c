@@ -93,6 +93,10 @@ const char *types[]= {
 // returns type index, -index if pointer
 // (However: "char *a, b" - b is char!)
 int gettype() {
+  int _static= got("static");
+  // TODO: handle static (scoped globals!)
+  // (how? may need move locals?)
+  assert(!_static);
   int _signed= got("signed");
   int _unsigned= got("unsigned");
   // long long? long double/float?
@@ -110,6 +114,59 @@ int gettype() {
   if (_signed || _unsigned)
     assert(!"unexpected signed/unsigned");
   return 0;
+}
+
+
+#define MAXVAR 1024
+
+struct variable {
+  int type; // 0==new scope
+  char *name;
+  int rel;
+} variables[MAXVAR]= {0};
+
+int nvar= 0;
+int lrel= 0;
+
+void addGlobal(int type, char *name) {
+  assert(nvar<MAXVAR);
+
+  struct variable *v= &variables[nvar];
+  v->type= type;
+  v->name= name?strdup(name):NULL;
+  v->rel= -1;
+
+  nvar++;
+}
+
+void addLocal(int type, char *name) {
+  assert(nvar<MAXVAR);
+
+  struct variable *v= &variables[nvar];
+  v->type= type;
+  v->name= name?strdup(name):NULL;
+  v->rel= ++lrel;
+
+  nvar++;
+}
+
+// TODO: this doesn NOT handle nested functions, not needed for standard C
+void beginScope() {
+  addGlobal(0, NULL);
+}
+
+void endScope() {
+  int i= nvar;
+  // delete all locals added since beginScope
+  while(i-->0) {
+    struct variable *v= &variables[i];
+    if (!v->type) { // is beginscope
+      nvar= i-1;
+      return;
+    }
+  }
+  // reach top scope, reset relative
+  lrel= 0;
 }
 
 void takeexpression();
