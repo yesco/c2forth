@@ -1,0 +1,29 @@
+Interpreter
+     WORD  NUMBER  INTERPRET  ABORT
+     HASH  FIND  '  FORGET
+     BASE  OCTAL  DECIMAL  HEX
+     LOAD  EXIT  EXECUTE  (
+Terminal
+     KEY  EXPECT
+     EMIT  CR  SPACE  SPACES  DIGIT  TYPE  DUMP
+Data stack
+     DUP  DROP  SWAP  OVER
+     +  -  *  /  MOD  NEGATE
+     ABS  MAX  MIN
+     AND  OR  XOR  NOT
+     0<  0=  =
+     @  !  +!  C@  C!
+     SQRT  SIN.COS  ATAN  EXP  LOG
+Return stack
+     :  ;  PUSH  POP  I
+Disk
+     BLOCK  UPDATE  FLUSH  BUFFER  PREV  OLDEST
+Compiler
+     CREATE  ALLOT  ,  SMUDGE
+     VARIABLE  CONSTANT
+     [  ]  LITERAL  ."  COMPILE
+     BEGIN  UNTIL  AGAIN  WHILE  REPEAT
+     DO  LOOP  +LOOP  IF  ELSE  THEN
+
+from https://colorforth.github.io/HOPL.html
+
