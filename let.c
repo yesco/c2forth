@@ -4,6 +4,14 @@ int a;
 int b= 42;
 char *s= "foo";
 
+int twoparthreeloc(int a, int b) {
+  int c= 11;
+  int d= 22;
+  int e= 33;
+  int f;
+  return a+b+c+d+e+44+55;
+}
+
 int main(void) {
   printf("a0=%d\n", a);
   a= 7;

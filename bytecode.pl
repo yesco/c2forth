@@ -14,6 +14,11 @@ $self = "[!\\\"#\$%&\'\(\)\*\+,\-./0123456789:;<=>?@\[\\\]\^_\`abcdefghijklmnopq
     "unloop", "]",
     "drop", "\\",
 
+    "parloc", "l#",
+    "setlocals", "l,",
+    "local@", "l@",
+    "local!", "l!",
+
     ":=", "`",
     "==", "=",
     "endif", ")",

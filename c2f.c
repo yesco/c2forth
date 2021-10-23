@@ -131,11 +131,15 @@ struct variable {
   int rel;
 } variables[MAXVAR]= {0};
 
-int nvar= 0;
+int nvar= 0, nglob= 0, nloc= 0;
 int lrel= 0;
 
 void addGlobal(int type, char *name) {
   assert(nvar<MAXVAR);
+
+  // TODO: handle statics which are "scoped" globals
+  if (name) // not scope
+    assert(lrel==0); // can't add globals inside function
 
   struct variable *v= &variables[nvar];
   v->type= type;
@@ -143,6 +147,7 @@ void addGlobal(int type, char *name) {
   v->rel= GLOBAL;
 
   nvar++;
+  nglob++;
 }
 
 void addLocal(int type, char *name) {
@@ -151,12 +156,16 @@ void addLocal(int type, char *name) {
   struct variable *v= &variables[nvar];
   v->type= type;
   v->name= name?strdup(name):NULL;
+  // there is no reuse inside one function
   v->rel= ++lrel;
 
   nvar++;
 }
 
 void dumpVars() {
+  // comment out for debug
+  return;
+
   // dump variables
   fflush(stdout);
   fprintf(stderr, "\n");
@@ -192,6 +201,7 @@ dumpVars();
 }
 
 struct variable *findVar(char* name) {
+  // search backwards to handle shadowing
   for(int i=nvar-1; i>=0; i--) {
     struct variable *v= &variables[i];
     if (v->name && 0==strcmp(v->name, name)) {
@@ -204,6 +214,15 @@ struct variable *findVar(char* name) {
 
 
 
+void deref(struct variable *v) {
+  if (!v) return;
+
+  if (v->rel==GLOBAL) {
+    printf(" @ ");
+  } else {
+    printf(" local@ ");
+  }
+}
 
 void takeexpression();
 
@@ -214,7 +233,9 @@ void takevardef(int type, char *name, const char *scope) {
   printf("    %s _%s\n", scope, name);
   if (got("=")) {
     takeexpression();
-    printf("    _%s !\n", name);
+    //printf("    _%s !\n", name);
+    struct variable *v= findVar(name);
+    printf(" %d local!\n", v->rel);
   }
 }
 
@@ -226,16 +247,6 @@ const char *getop() {
     if (got(ops[i])) return ops[i];
   }
   return NULL;
-}
-
-void deref(struct variable *v) {
-  if (!v) return;
-
-  if (v->rel==GLOBAL) {
-    printf(" @ ");
-  } else {
-    printf(" @frame ");
-  }
 }
 
 void takeblock();
@@ -295,6 +306,7 @@ void takeexpression() {
     step();
     printf("\"\n");
   } else if (got("\'")) {
+    // char
     printf("    %d\n", step());
     expect("\'");
   } else {
@@ -316,8 +328,12 @@ void takeexpression() {
         op= ":frame=";
       }
     } else {
+      // if have ref
       deref(var);
     }
+    // TODO: too deep: 1+2+3 1 2 3 + + + => 1 2 + 3 + (same prio)
+    // TODO: handle priorities?
+    // (takexp) could return prio, if current prio <= takeexpr (?) switch order
     takeexpression();
     printf("    %s", op);
 
@@ -404,23 +420,31 @@ void takeprogram() {
 
         // params
         printf(" {");
-        int type;
+        int type, npar= 0;
         while((type= gettype())) {
           char *param= getname();
           if (!param || !*param) break;
           printf("  _%s", param);
+          npar++;
           addLocal(type, param);
           free(param);
           got(",");
         }
-        printf(" }\n");
+        printf(" } %d %d parloc\n", npar, 0);
+        // TODO: 0 may be modifed later by 'setlocals'
         expect(")");
 
         // body
         takeblock();
 
         endScope();
-        printf("    ;\n");
+
+        // 'setlocals' is like 'immediate' - modifies word defined
+        printf("    ; %d setlocals\n", lrel-npar);
+
+        // one extra to reset
+        endScope();
+        assert(lrel==0);
 
       } else { // variable
         // TODO: store type... (maybe no need for int and char* lol?)
