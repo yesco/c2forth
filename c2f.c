@@ -158,9 +158,11 @@ void addLocal(int type, char *name) {
 
 void dumpVars() {
   // dump variables
+  fflush(stdout);
+  fprintf(stderr, "\n");
   for(int i=0; i<nvar; i++) {
     struct variable *v= &variables[i];
-    printf("VAR %s : %s %s %d\n", v->name,
+    fprintf(stderr, "VAR %s : %s %s %d\n", v->name,
            !v->type? "SCOPE" : types[v->type<0?-v->type:v->type],
            v->type<0? "*": " ",
            v->rel);

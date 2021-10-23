@@ -5,6 +5,8 @@
 // The Conceptual ALfabetical Forth:
 // - https://github.com/yesco/ALForth/blob/main/alf-bytecode.txt
 
+// TODO: test if stack grow up/down is faster...
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -116,9 +118,17 @@ int type(byte *s) {
   return s-start;
 }
 
-void NIY(char *name) {
-  printf("%% %s not implemented yet!\n", name);
+void niy(char m, char o, char *s) {
+  if (!m && !o) {
+    printf("%% %s not implemented yet!\n", s);
+  } else {
+    printf("%% %s '%c %c' not implemented yet! (%s)\n", s?s:"", m, o);
+  }
   exit(1);
+}
+
+void NIY(char *name) {
+  niy(0, 0, name);
 }
 
 void seek(byte end) {
@@ -166,9 +176,7 @@ void hash() {
 
   //case '#/#': // /%
 
-  default:
-    printf("%% illegal extened op '#%c'\n", op);
-    exit(1);
+  default: niy('#', op, NULL);
   }
 }
 
@@ -201,9 +209,7 @@ void ccc() {
   case '\'':  // c' or '
   case 'c':  // create
 
-  default:
-    printf("%% illegal extened op 'c%c'\n", op);
-    exit(1);
+  default: niy('c', op, NULL);
   }
 }
 
@@ -217,9 +223,7 @@ void dollar() {
 
   case 'l': // accept/readline
 
-  default:
-    printf("%% illegal extened op '$%c'\n", op);
-    exit(1);
+  default: niy('$', op, NULL);
   }
 }
 
@@ -255,9 +259,7 @@ void lll() {
     break; }
   case 'a'...'j': *++sp= *(fp+(op-'a')); break;
 
-  default:
-    printf("%% illegal extened op 'l%c'\n", op);
-    exit(1);
+  default: niy('l', op, NULL);
   }
 }
 
@@ -266,6 +268,8 @@ void user(byte op) {
 }
 
 void rrr() {
+  cell a;
+
   byte op= mem[pc++];
   if (trace) print_op(pc-1, op);
   switch(op) {
@@ -273,9 +277,11 @@ void rrr() {
   case '<': *++rp= *sp--; break;
   case '>': *++sp= *rp--; break;
 
-  case 't': // rot
-  case '-': // rot-
-  case 'l': // roll
+  case 't': // rot: 2 1 0 -> 1 0 2
+    a= sp[0]; sp[0]= sp[-2]; sp[-2]= sp[-1]; sp[-1]= a; break;
+    // -rot 2 1 0 -> 0 2 1
+  case '-': NIY("-rot"); // -rot
+  case 'l': NIY("roll"); // roll
 
   case '@': // r@
   case '!': // r!
@@ -284,12 +290,10 @@ void rrr() {
   //case 't': // throw
   //case 'e': // err catch
 
-    // r\d<    nr>
-    // r\d>    nr>
+  // r\d<    nr>
+  // r\d>    nr>
 
-  default:
-    printf("%% illegal extened op 'r%c'\n", op);
-    exit(1);
+  default: niy('r', op, NULL);
   }
 }
 
@@ -435,7 +439,7 @@ void run(int steps) {
     case 'j': *++sp= *(rp-2); break;
 
       // HMMM, control codes?
-    case (1)...(9): pc+= op; break; // rel
+    case (1)...(7): pc+= op; break; // rel
     case (14)...(31): pc+= op-32; break; // -rel
 
     case '\\': sp--; break;
@@ -510,9 +514,9 @@ void run(int steps) {
       // unicode 1111 1110 (1) (debug)
       // unicode 1111 1111 (1) (return)
 
-    case '`': // "sos!" (c a= b= v)
-      **(sp-1)= *sp;
-      sp--;
+    case '`': // (var= val)=>val
+      a= *sp--;
+      *sp= *(cell*)*sp= a;
       break;
 
       // user ops (2% faster below 0!)
@@ -556,10 +560,7 @@ void run(int steps) {
 //    case 'w': www(); break; // 2...
 //    case 'y': yyy(); break; // ???
 
-    default:
-      printf("%%Illegal op "); print_op(pc-1, op);
-      pc= 0;
-      return;
+    default: niy(op, 0, NULL);
     }
   }
 }
