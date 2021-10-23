@@ -122,7 +122,7 @@ void niy(char m, char o, char *s) {
   if (!m && !o) {
     printf("%% %s not implemented yet!\n", s);
   } else {
-    printf("%% %s '%c %c' not implemented yet! (%s)\n", s?s:"", m, o);
+    printf("%% %s '%c %c' not implemented yet!\n", s?s:"", m, o);
   }
   exit(1);
 }

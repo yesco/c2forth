@@ -230,7 +230,8 @@ void takevardef(int type, char *name, const char *scope) {
   int array= got("[");
   // TODO: handle array decl/assign
   assert(!array);
-  printf("    %s _%s\n", scope, name);
+  if (scope=="global")
+    printf("    %s _%s\n", scope, name);
   if (got("=")) {
     takeexpression();
     //printf("    _%s !\n", name);
@@ -419,18 +420,19 @@ void takeprogram() {
         beginScope();
 
         // params
-        printf(" {");
+//        printf(" {");
         int type, npar= 0;
         while((type= gettype())) {
           char *param= getname();
           if (!param || !*param) break;
-          printf("  _%s", param);
+//          printf("  _%s", param);
           npar++;
           addLocal(type, param);
           free(param);
           got(",");
         }
-        printf(" } %d %d parloc\n", npar, 0);
+//        printf(" } %d %d parloc\n", npar, 0);
+        printf(" %d %d parloc\n", npar, 0);
         // TODO: 0 may be modifed later by 'setlocals'
         expect(")");
 

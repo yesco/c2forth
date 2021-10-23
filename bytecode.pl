@@ -22,6 +22,10 @@ $self = "[!\\\"#\$%&\'\(\)\*\+,\-./0123456789:;<=>?@\[\\\]\^_\`abcdefghijklmnopq
     ":=", "`",
     "==", "=",
     "endif", ")",
+
+    # import functions
+    # TODO: add par count in compilation
+
     "putchar", "14 x",
     "printf", "16 x",
 );
@@ -32,12 +36,11 @@ $wnum= 65; # 'A'...
 
 sub w {
     my ($w)= @_;
+    $w =~ s/^_(\S+)$/$1/;
     my $r= $words{$w};
     return $r if $r;
     return $w if $w =~ /^[^a-zA-Z]*$/;
 
-    # TODO: local vars
-    print STDERR "\nDEFINED $w\n";
     if ($wnum>=255) {
         die "problem- too many wnum!";
     }
@@ -46,9 +49,11 @@ sub w {
     $words{$w} = $r;
     $words{$r} = $w; # yeah... lol
 
+    # TODO: local vars
+    print STDERR "\nDEFINED $r = $w\n";
+
     return $r;
 }
-
 
 $f =~ s/(\S+)/w($1)/smeg;
 $f =~ s/^\s*//smg;
